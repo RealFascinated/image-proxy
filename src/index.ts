@@ -65,7 +65,7 @@ const app = new Elysia()
     });
 
     // Generate example URL with all options
-    const exampleUrl = "https://example.com/image.jpg";
+    const exampleUrl = "https://cdn.fascinated.cc/eUyubC.webp";
     const exampleOptions = {
       width: 800,
       height: 600,
