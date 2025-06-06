@@ -23,33 +23,16 @@ export function proxy(app: Elysia) {
     const before = performance.now();
     const url = decodeURIComponent(params["*"]);
 
-    // Extract the actual image URL and clean up any query parameters
-    const imageUrl = url.split("?")[0] || url;
-
-    // Clean up the query parameters
-    const cleanQuery = Object.fromEntries(
-      Object.entries(query).map(([key, value]) => {
-        // If the value contains a question mark, take only the part after it
-        const cleanValue = value.includes("?")
-          ? value.split("?")[1]?.split("=")[1] || ""
-          : value;
-        return [key, cleanValue];
-      })
-    ) as Record<string, string>;
-
     // Checks if the URL is valid
-    if (!isValidHttpUrl(imageUrl)) {
+    if (!isValidHttpUrl(url)) {
       return new BadRequestError("Invalid URL");
     }
 
     // Parse the URL to handle existing query parameters
-    const parsedUrl = new URL(imageUrl);
-
-    // Get the base URL without query parameters
-    const baseUrl = `${parsedUrl.origin}${parsedUrl.pathname}`;
+    const parsedUrl = new URL(url);
 
     // Get the options from our cleaned query parameters
-    const options = getImageOptions(cleanQuery);
+    const options = getImageOptions(query);
 
     // Checks if any processors can run
     const processorsToRun = processors.filter((processor) =>
@@ -66,7 +49,7 @@ export function proxy(app: Elysia) {
     }
 
     // Create a cache key for the processed image
-    const cacheKey = `${baseUrl}?${JSON.stringify(options)}`;
+    const cacheKey = `${url}?${JSON.stringify(options)}`;
 
     // Check if we have a cached processed image
     if (processedCache.getIfPresent(cacheKey)) {
@@ -87,10 +70,10 @@ export function proxy(app: Elysia) {
 
     let imageBuffer: Buffer;
     // Check if the original image is cached
-    if (originalCache.getIfPresent(baseUrl)) {
-      imageBuffer = originalCache.getIfPresent(baseUrl) as Buffer;
+    if (originalCache.getIfPresent(url)) {
+      imageBuffer = originalCache.getIfPresent(url) as Buffer;
     } else {
-      const imageData = await request.get<ArrayBuffer>(baseUrl, {
+      const imageData = await request.get<ArrayBuffer>(url, {
         returns: "arraybuffer",
         headers: {
           Accept: "image/*",
@@ -105,10 +88,8 @@ export function proxy(app: Elysia) {
 
       // Cache the original image
       imageBuffer = Buffer.from(imageData);
-      originalCache.put(baseUrl, imageBuffer);
+      originalCache.put(url, imageBuffer);
     }
-
-    const originalSize = imageBuffer.byteLength;
 
     // Convert the image to a sharp image with optimized settings
     let sharpImage = sharp(imageBuffer, {
@@ -130,7 +111,7 @@ export function proxy(app: Elysia) {
     // Log the size comparison
     const timeDiff = after - before;
     console.log(
-      `[${url}] Original: ${formatBytes(originalSize)} in ${formatDuration(
+      `[${url}] Image: ${formatBytes(image.byteLength)} in ${formatDuration(
         timeDiff
       )}`
     );

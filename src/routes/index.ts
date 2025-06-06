@@ -1,13 +1,7 @@
 import type Elysia from "elysia";
-import { processors } from "..";
-import { imageOptions } from "../common/image-options";
 
 export function index(app: Elysia) {
-  app.get("/", ({ request }) => {
-    // Get the host from the request
-    const host = request.headers.get("host") || "localhost:3000";
-    const protocol = request.headers.get("x-forwarded-proto") || "http";
-
+  app.get("/", () => {
     // Generate options documentation from the schema
     const optionsDocs = [
       {
@@ -27,46 +21,11 @@ export function index(app: Elysia) {
         required: false,
       },
       {
-        name: "quality",
-        description: "Image quality (1-100)",
-        required: false,
-      },
-      {
-        name: "format",
-        description: "Output format (png, jpeg, webp)",
-        required: false,
-      },
-      {
-        name: "rounded",
-        description: "Add rounded corners (0-100 percentage of max radius)",
+        name: "optimize",
+        description: "Optimize the image and return a webp image",
         required: false,
       },
     ];
-
-    // Generate processor documentation
-    const processorDocs = processors.map((processor) => {
-      const name = processor.constructor.name.replace("Processor", "");
-      const options = Object.keys(processor.canRun({}));
-      return {
-        name,
-        options,
-      };
-    });
-
-    // Generate example URL with all options
-    const exampleUrl = "https://cdn.fascinated.cc/eUyubC.webp";
-    const exampleOptions = {
-      width: 800,
-      height: 600,
-      quality: 80,
-      format: "webp",
-      rounded: 20,
-    };
-    const exampleQueryString = Object.entries(exampleOptions)
-      .map(([key, value]) => `${key}=${value}`)
-      .join("&");
-    const exampleUrlEncoded = encodeURIComponent(exampleUrl);
-    const exampleFullUrl = `${protocol}://${host}/${exampleUrlEncoded}?${exampleQueryString}`;
 
     return new Response(
       `<!DOCTYPE html>
@@ -82,18 +41,20 @@ export function index(app: Elysia) {
                 max-width: 800px;
                 margin: 0 auto;
                 padding: 2rem;
-                color: #333;
+                color: #e2e8f0;
+                background-color: #1a1a1a;
             }
-            h1 { color: #2563eb; }
-            h2 { color: #1e40af; margin-top: 2rem; }
+            h1 { color: #a855f7; }
+            h2 { color: #c084fc; margin-top: 2rem; }
             code {
-                background: #f1f5f9;
+                background: #2a2a2a;
                 padding: 0.2rem 0.4rem;
                 border-radius: 4px;
                 font-family: monospace;
+                color: #f1f5f9;
             }
             .example {
-                background: #f8fafc;
+                background: #2a2a2a;
                 padding: 1rem;
                 border-radius: 8px;
                 margin: 1rem 0;
@@ -106,14 +67,14 @@ export function index(app: Elysia) {
                 font-weight: 500;
             }
             .processor {
-                background: #f1f5f9;
+                background: #2a2a2a;
                 padding: 1rem;
                 border-radius: 8px;
                 margin: 1rem 0;
             }
             .processor h3 {
                 margin-top: 0;
-                color: #1e40af;
+                color: #c084fc;
             }
         </style>
     </head>
@@ -122,10 +83,13 @@ export function index(app: Elysia) {
         <p>This service allows you to process images on-the-fly with various options.</p>
     
         <h2>Usage</h2>
-        <p>Make a GET request to the following endpoint:</p>
+        <p>Example usage:</p>
         <div class="example">
-            <code>GET /{encoded_image_url}?options</code>
+            <code>GET /{encoded_image_url}?optimize=true</code>
         </div>
+        <p>
+          This will optimize the image and return a webp image. The image URL must be URL-encoded and not contain any query parameters.
+        </p>
     
         <h2>Available Options</h2>
         <div class="options">
@@ -143,37 +107,6 @@ export function index(app: Elysia) {
               )
               .join("")}
         </div>
-    
-        <h2>Available Processors</h2>
-        ${processorDocs
-          .map(
-            (processor) => `
-        <div class="processor">
-            <h3>${processor.name}</h3>
-            <p>This processor handles the following options:</p>
-            <ul>
-                ${processor.options
-                  .map((option) => `<li><code>${option}</code></li>`)
-                  .join("")}
-            </ul>
-        </div>`
-          )
-          .join("")}
-    
-        <h2>Example</h2>
-        <div class="example">
-            <code>${exampleFullUrl}</code>
-        </div>
-    
-        <h2>Notes</h2>
-        <ul>
-            <li>The image URL must be URL-encoded</li>
-            <li>At least one processing option must be provided</li>
-            <li>Supported input formats: ${imageOptions.shape.format
-              .unwrap()
-              ._def.values.join(", ")}</li>
-            <li>All numeric options are validated against their min/max values</li>
-        </ul>
     </body>
     </html>`,
       {
