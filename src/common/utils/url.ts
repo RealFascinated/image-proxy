@@ -8,7 +8,13 @@ export function isValidHttpUrl(string: string) {
   let url;
 
   try {
-    url = new URL(string);
+    // If the string starts with http:// or https://, use it directly
+    if (string.startsWith("http://") || string.startsWith("https://")) {
+      url = new URL(string);
+    } else {
+      // Otherwise, try to parse it as a relative URL
+      url = new URL(string, "http://localhost");
+    }
   } catch (_) {
     return false;
   }

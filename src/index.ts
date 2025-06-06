@@ -194,91 +194,104 @@ const app = new Elysia()
   })
   .get("/*", async ({ params, query }) => {
     const url = decodeURIComponent(params["*"]);
-    const options = getImageOptions(query);
+
+    // Extract the actual image URL and clean up any query parameters
+    const imageUrl = url.split("?")[0] || url;
+
+    // Clean up the query parameters
+    const cleanQuery = Object.fromEntries(
+      Object.entries(query).map(([key, value]) => {
+        // If the value contains a question mark, take only the part after it
+        const cleanValue = value.includes("?")
+          ? value.split("?")[1]?.split("=")[1] || ""
+          : value;
+        return [key, cleanValue];
+      })
+    ) as Record<string, string>;
 
     // Checks if the URL is valid
-    if (!isValidHttpUrl(url)) {
+    if (!isValidHttpUrl(imageUrl)) {
       return {
         error: "Invalid URL",
       };
     }
 
-    // Parse the URL to handle existing query parameters
-    const parsedUrl = new URL(url);
-    // Remove any existing query parameters from the URL
-    const cleanUrl = `${parsedUrl.origin}${parsedUrl.pathname}`;
+    try {
+      // Parse the URL to handle existing query parameters
+      const parsedUrl = new URL(imageUrl);
 
-    // Checks if any processors can run
-    const processorsToRun = processors.filter((processor) =>
-      processor.canRun(options)
-    );
-    if (processorsToRun.length === 0) {
+      // Get the base URL without query parameters
+      const baseUrl = `${parsedUrl.origin}${parsedUrl.pathname}`;
+
+      // Get the options from our cleaned query parameters
+      const options = getImageOptions(cleanQuery);
+
+      // Checks if any processors can run
+      const processorsToRun = processors.filter((processor) =>
+        processor.canRun(options)
+      );
+
+      if (processorsToRun.length === 0) {
+        return {
+          error: "No processors found for the given options",
+        };
+      }
+
+      // No options were provided
+      if (Object.keys(options).length === 0) {
+        return {
+          error: "No options provided",
+        };
+      }
+
+      // Fetch the image
+      const imageResponse = await fetch(baseUrl);
+
+      // Check if the image was fetched successfully
+      if (!imageResponse.ok) {
+        return {
+          error: "Failed to fetch image",
+        };
+      }
+
+      // Check if the image is valid
+      const contentType = imageResponse.headers.get("Content-Type");
+      if (!contentType || !contentType.startsWith("image/")) {
+        return {
+          error: "Invalid image",
+        };
+      }
+
+      const imageBuffer = await imageResponse.arrayBuffer();
+
+      // Convert the image to a sharp image
+      let sharpImage = sharp(imageBuffer);
+
+      // Run the processors
+      for (const processor of processors) {
+        sharpImage = await processor.run(options, sharpImage);
+      }
+
+      const image = await sharpImage.toBuffer();
+
+      // Extract filename from URL path
+      const urlPath = parsedUrl.pathname;
+      const filename = urlPath.split("/").pop()?.split(".")[0] || "image";
+
+      // Return the image
+      return new Response(image, {
+        headers: {
+          "Content-Disposition": `inline; filename="${filename}.${
+            options.format || "webp"
+          }"`,
+          "Content-Type": `image/${options.format || "webp"}`,
+        },
+      });
+    } catch (error) {
       return {
-        error: "No processors found",
+        error: "Invalid URL format",
       };
     }
-
-    // No options were provided
-    if (Object.keys(options).length === 0) {
-      return {
-        error: "No options provided",
-      };
-    }
-
-    // Fetch the image
-    console.log(`Fetching image from ${cleanUrl}...`);
-    const imageResponse = await fetch(cleanUrl);
-
-    // Check if the image was fetched successfully
-    if (!imageResponse.ok) {
-      return {
-        error: "Failed to fetch image",
-      };
-    }
-
-    // Check if the image is valid
-    const contentType = imageResponse.headers.get("Content-Type");
-    if (!contentType || !contentType.startsWith("image/")) {
-      return {
-        error: "Invalid image",
-      };
-    }
-
-    const imageBuffer = await imageResponse.arrayBuffer();
-    console.log(
-      `Image from ${cleanUrl} fetched successfully, size: ${formatBytes(
-        imageBuffer.byteLength
-      )}`
-    );
-
-    // Convert the image to a sharp image
-    let sharpImage = sharp(imageBuffer);
-
-    // Run the processors
-    for (const processor of processors) {
-      sharpImage = await processor.run(options, sharpImage);
-    }
-
-    const image = await sharpImage.toBuffer();
-    console.log(
-      `Image processed successfully, new size: ${formatBytes(
-        image.byteLength
-      )}, original size: ${formatBytes(imageBuffer.byteLength)}`
-    );
-
-    // Extract filename from URL path
-    const urlPath = new URL(url).pathname;
-    const filename = urlPath.split("/").pop()?.split(".")[0] || "image";
-
-    // Return the image
-    return new Response(image, {
-      headers: {
-        "Content-Disposition": `inline; filename="${filename}.${
-          options.format || "webp"
-        }"`,
-        "Content-Type": `image/${options.format || "webp"}`,
-      },
-    });
   })
   .listen(3000);
 
