@@ -9,7 +9,18 @@ import { formatDuration } from "../common/utils/time";
 import { Caches } from "@inventivetalent/loading-cache";
 import { Time } from "@inventivetalent/time";
 
-const cache = Caches.builder().expireAfterWrite(Time.minutes(10)).build();
+// Configure Sharp for better performance
+sharp.cache(false); // Disable internal cache since we're using our own
+sharp.concurrency(4); // Limit concurrent operations
+sharp.simd(true); // Enable SIMD if available
+
+// Cache for both original and processed images
+const originalCache = Caches.builder()
+  .expireAfterWrite(Time.minutes(10))
+  .build();
+const processedCache = Caches.builder()
+  .expireAfterWrite(Time.minutes(10))
+  .build();
 
 export function proxy(app: Elysia) {
   app.get("/*", async ({ params, query }) => {
@@ -58,10 +69,30 @@ export function proxy(app: Elysia) {
       return new BadRequestError("No options provided");
     }
 
+    // Create a cache key for the processed image
+    const cacheKey = `${baseUrl}?${JSON.stringify(options)}`;
+
+    // Check if we have a cached processed image
+    if (processedCache.getIfPresent(cacheKey)) {
+      const cachedImage = processedCache.getIfPresent(cacheKey) as Buffer;
+      const after = performance.now();
+      console.log(
+        `[${url}] Original: ${formatBytes(
+          cachedImage.byteLength
+        )} in ${formatDuration(after - before)} (cached)`
+      );
+      return new Response(cachedImage, {
+        headers: {
+          "Content-Type": `image/${options.optimize ? "webp" : "png"}`,
+          "Cache-Control": "public, max-age=3600, immutable",
+        },
+      });
+    }
+
     let imageBuffer: Buffer;
     // Check if the original image is cached
-    if (cache.getIfPresent(baseUrl)) {
-      imageBuffer = cache.getIfPresent(baseUrl) as Buffer;
+    if (originalCache.getIfPresent(baseUrl)) {
+      imageBuffer = originalCache.getIfPresent(baseUrl) as Buffer;
     } else {
       const imageResponse = await fetch(baseUrl);
 
@@ -78,13 +109,16 @@ export function proxy(app: Elysia) {
 
       // Cache the original image
       imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
-      cache.put(baseUrl, imageBuffer);
+      originalCache.put(baseUrl, imageBuffer);
     }
 
     const originalSize = imageBuffer.byteLength;
 
-    // Convert the image to a sharp image
-    let sharpImage = sharp(imageBuffer);
+    // Convert the image to a sharp image with optimized settings
+    let sharpImage = sharp(imageBuffer, {
+      failOn: "none", // Don't fail on corrupt images
+      limitInputPixels: 100000000, // Limit input size to prevent memory issues
+    });
 
     // Run the processors
     for (const processor of processorsToRun) {
@@ -93,6 +127,9 @@ export function proxy(app: Elysia) {
 
     const image = await sharpImage.toBuffer();
     const after = performance.now();
+
+    // Cache the processed image
+    processedCache.put(cacheKey, image);
 
     // Log the size comparison
     const timeDiff = after - before;
