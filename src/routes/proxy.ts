@@ -96,12 +96,14 @@ export function proxy(app: Elysia) {
     const after = performance.now();
 
     // Log the size comparison
+    const sizeChange = ((processedSize - originalSize) / originalSize) * 100;
+    const changeType = sizeChange > 0 ? "increased" : "decreased";
     console.log(
       `[${url}] Original: ${formatBytes(
         originalSize
-      )}, Processed: ${formatBytes(processedSize)} (${
-        (1 - processedSize / originalSize) * 100
-      }% reduction) in ${after - before}ms`
+      )}, Processed: ${formatBytes(processedSize)} (${Math.abs(
+        sizeChange
+      )}% ${changeType}) in ${after - before}ms`
     );
 
     // Extract filename from URL path
