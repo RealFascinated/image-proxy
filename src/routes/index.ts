@@ -1,5 +1,6 @@
 import type Elysia from "elysia";
 import { processors } from "..";
+import { imageOptions } from "../common/image-options";
 
 export function index(app: Elysia) {
   app.get("/", ({ request }) => {
@@ -168,7 +169,9 @@ export function index(app: Elysia) {
         <ul>
             <li>The image URL must be URL-encoded</li>
             <li>At least one processing option must be provided</li>
-            <li>Supported input formats: JPEG, PNG, WebP, GIF</li>
+            <li>Supported input formats: ${imageOptions.shape.format
+              .unwrap()
+              ._def.values.join(", ")}</li>
             <li>All numeric options are validated against their min/max values</li>
         </ul>
     </body>

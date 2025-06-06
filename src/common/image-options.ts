@@ -1,12 +1,34 @@
 import { z } from "zod";
 import { BadRequestError } from "./error/bad-request";
 
-const imageOptions = z.object({
+export const imageOptions = z.object({
   width: z.number().min(1).max(10000).optional(),
   height: z.number().min(1).max(10000).optional(),
   size: z.number().min(1).max(10000).optional(),
   quality: z.number().min(1).max(100).optional(),
-  format: z.enum(["png", "jpeg", "webp"]).optional(),
+  format: z
+    .enum([
+      "heic",
+      "heif",
+      "avif",
+      "jpeg",
+      "jpg",
+      "jpe",
+      "tile",
+      "dz",
+      "png",
+      "raw",
+      "tiff",
+      "tif",
+      "webp",
+      "gif",
+      "jp2",
+      "jpx",
+      "j2k",
+      "j2c",
+      "jxl",
+    ])
+    .optional(),
   rounded: z.number().min(0).max(100).optional(),
 });
 
