@@ -46,6 +46,22 @@ const app = new Elysia()
     // Fetch the image
     console.log(`Fetching image from ${url}...`);
     const imageResponse = await fetch(url);
+
+    // Check if the image was fetched successfully
+    if (!imageResponse.ok) {
+      return {
+        error: "Failed to fetch image",
+      };
+    }
+
+    // Check if the image is valid
+    const contentType = imageResponse.headers.get("Content-Type");
+    if (!contentType || !contentType.startsWith("image/")) {
+      return {
+        error: "Invalid image",
+      };
+    }
+
     const imageBuffer = await imageResponse.arrayBuffer();
     console.log(
       `Image from ${url} fetched successfully, size: ${formatBytes(
