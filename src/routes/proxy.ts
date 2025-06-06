@@ -107,14 +107,14 @@ export function proxy(app: Elysia) {
     // Extract filename from URL path
     const urlPath = parsedUrl.pathname;
     const filename = urlPath.split("/").pop()?.split(".")[0] || "image";
+    const originalExtension = urlPath.split(".").pop()?.toLowerCase() || "png";
+    const extension = options.optimize ? "webp" : originalExtension;
 
     // Return the image
     return new Response(image, {
       headers: {
-        "Content-Disposition": `inline; filename="${filename}.${
-          options.format || "webp"
-        }"`,
-        "Content-Type": `image/${options.format || "webp"}`,
+        "Content-Disposition": `inline; filename="${filename}.${extension}"`,
+        "Content-Type": `image/${extension}`,
         "Cache-Control": "public, max-age=3600, immutable", // 1 hour
       },
     });
