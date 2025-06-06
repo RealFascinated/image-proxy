@@ -1,0 +1,183 @@
+import type Elysia from "elysia";
+import { processors } from "..";
+
+export function index(app: Elysia) {
+  app.get("/", ({ request }) => {
+    // Get the host from the request
+    const host = request.headers.get("host") || "localhost:3000";
+    const protocol = request.headers.get("x-forwarded-proto") || "http";
+
+    // Generate options documentation from the schema
+    const optionsDocs = [
+      {
+        name: "width",
+        description: "Resize image width (1-10000 pixels)",
+        required: false,
+      },
+      {
+        name: "height",
+        description: "Resize image height (1-10000 pixels)",
+        required: false,
+      },
+      {
+        name: "size",
+        description:
+          "Resize both width and height to the same value (1-10000 pixels)",
+        required: false,
+      },
+      {
+        name: "quality",
+        description: "Image quality (1-100)",
+        required: false,
+      },
+      {
+        name: "format",
+        description: "Output format (png, jpeg, webp)",
+        required: false,
+      },
+      {
+        name: "rounded",
+        description: "Add rounded corners (0-100 percentage of max radius)",
+        required: false,
+      },
+    ];
+
+    // Generate processor documentation
+    const processorDocs = processors.map((processor) => {
+      const name = processor.constructor.name.replace("Processor", "");
+      const options = Object.keys(processor.canRun({}));
+      return {
+        name,
+        options,
+      };
+    });
+
+    // Generate example URL with all options
+    const exampleUrl = "https://cdn.fascinated.cc/eUyubC.webp";
+    const exampleOptions = {
+      width: 800,
+      height: 600,
+      quality: 80,
+      format: "webp",
+      rounded: 20,
+    };
+    const exampleQueryString = Object.entries(exampleOptions)
+      .map(([key, value]) => `${key}=${value}`)
+      .join("&");
+    const exampleUrlEncoded = encodeURIComponent(exampleUrl);
+    const exampleFullUrl = `${protocol}://${host}/${exampleUrlEncoded}?${exampleQueryString}`;
+
+    return new Response(
+      `<!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Image Proxy Service</title>
+        <style>
+            body {
+                font-family: system-ui, -apple-system, sans-serif;
+                line-height: 1.6;
+                max-width: 800px;
+                margin: 0 auto;
+                padding: 2rem;
+                color: #333;
+            }
+            h1 { color: #2563eb; }
+            h2 { color: #1e40af; margin-top: 2rem; }
+            code {
+                background: #f1f5f9;
+                padding: 0.2rem 0.4rem;
+                border-radius: 4px;
+                font-family: monospace;
+            }
+            .example {
+                background: #f8fafc;
+                padding: 1rem;
+                border-radius: 8px;
+                margin: 1rem 0;
+                overflow-x: auto;
+            }
+            .option {
+                margin-bottom: 0.5rem;
+            }
+            .option code {
+                font-weight: 500;
+            }
+            .processor {
+                background: #f1f5f9;
+                padding: 1rem;
+                border-radius: 8px;
+                margin: 1rem 0;
+            }
+            .processor h3 {
+                margin-top: 0;
+                color: #1e40af;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Image Proxy Service</h1>
+        <p>This service allows you to process images on-the-fly with various options.</p>
+    
+        <h2>Usage</h2>
+        <p>Make a GET request to the following endpoint:</p>
+        <div class="example">
+            <code>GET /{encoded_image_url}?options</code>
+        </div>
+    
+        <h2>Available Options</h2>
+        <div class="options">
+            ${optionsDocs
+              .map(
+                (option) => `
+            <div class="option">
+                <code>${option.name}</code> - ${option.description}
+                ${
+                  option.required
+                    ? '<span style="color: #dc2626">(required)</span>'
+                    : ""
+                }
+            </div>`
+              )
+              .join("")}
+        </div>
+    
+        <h2>Available Processors</h2>
+        ${processorDocs
+          .map(
+            (processor) => `
+        <div class="processor">
+            <h3>${processor.name}</h3>
+            <p>This processor handles the following options:</p>
+            <ul>
+                ${processor.options
+                  .map((option) => `<li><code>${option}</code></li>`)
+                  .join("")}
+            </ul>
+        </div>`
+          )
+          .join("")}
+    
+        <h2>Example</h2>
+        <div class="example">
+            <code>${exampleFullUrl}</code>
+        </div>
+    
+        <h2>Notes</h2>
+        <ul>
+            <li>The image URL must be URL-encoded</li>
+            <li>At least one processing option must be provided</li>
+            <li>Supported input formats: JPEG, PNG, WebP, GIF</li>
+            <li>All numeric options are validated against their min/max values</li>
+        </ul>
+    </body>
+    </html>`,
+      {
+        headers: {
+          "Content-Type": "text/html",
+        },
+      }
+    );
+  });
+}
