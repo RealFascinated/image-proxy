@@ -203,6 +203,11 @@ const app = new Elysia()
       };
     }
 
+    // Parse the URL to handle existing query parameters
+    const parsedUrl = new URL(url);
+    // Remove any existing query parameters from the URL
+    const cleanUrl = `${parsedUrl.origin}${parsedUrl.pathname}`;
+
     // Checks if any processors can run
     const processorsToRun = processors.filter((processor) =>
       processor.canRun(options)
@@ -221,8 +226,8 @@ const app = new Elysia()
     }
 
     // Fetch the image
-    console.log(`Fetching image from ${url}...`);
-    const imageResponse = await fetch(url);
+    console.log(`Fetching image from ${cleanUrl}...`);
+    const imageResponse = await fetch(cleanUrl);
 
     // Check if the image was fetched successfully
     if (!imageResponse.ok) {
@@ -241,7 +246,7 @@ const app = new Elysia()
 
     const imageBuffer = await imageResponse.arrayBuffer();
     console.log(
-      `Image from ${url} fetched successfully, size: ${formatBytes(
+      `Image from ${cleanUrl} fetched successfully, size: ${formatBytes(
         imageBuffer.byteLength
       )}`
     );
