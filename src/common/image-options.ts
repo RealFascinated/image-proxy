@@ -19,15 +19,20 @@ export type ImageOptions = z.infer<typeof imageOptions>;
  * @throws BadRequestError if validation fails
  */
 export function getImageOptions(query: Record<string, string>) {
-  const numericQuery = Object.fromEntries(
+  const parsedQuery = Object.fromEntries(
     Object.entries(query).map(([key, value]) => {
+      // Handle booleans
+      if (value.toLowerCase() === "true") return [key, true];
+      if (value.toLowerCase() === "false") return [key, false];
+
+      // Handle numbers
       const num = Number(value);
       return [key, isNaN(num) ? value : num];
     })
   );
 
   try {
-    const options = imageOptions.parse(numericQuery);
+    const options = imageOptions.parse(parsedQuery);
 
     if (options.size) {
       options.width = options.size;
