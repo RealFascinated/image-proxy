@@ -8,11 +8,7 @@ import { formatBytes } from "../common/utils/utils";
 import { formatDuration } from "../common/utils/time";
 import { Caches } from "@inventivetalent/loading-cache";
 import { Time } from "@inventivetalent/time";
-
-// Configure Sharp for better performance
-sharp.cache(false); // Disable internal cache since we're using our own
-sharp.concurrency(4); // Limit concurrent operations
-sharp.simd(true); // Enable SIMD if available
+import request from "../common/utils/request";
 
 // Cache for both original and processed images
 const originalCache = Caches.builder()
@@ -94,21 +90,21 @@ export function proxy(app: Elysia) {
     if (originalCache.getIfPresent(baseUrl)) {
       imageBuffer = originalCache.getIfPresent(baseUrl) as Buffer;
     } else {
-      const imageResponse = await fetch(baseUrl);
+      const imageData = await request.get<ArrayBuffer>(baseUrl, {
+        returns: "arraybuffer",
+        headers: {
+          Accept: "image/*",
+          "User-Agent": "ImageProxy/1.0",
+        },
+        throwOnError: true,
+      });
 
-      // Check if the image was fetched successfully
-      if (!imageResponse.ok) {
+      if (!imageData) {
         return new BadRequestError("Failed to fetch image");
       }
 
-      // Check if the image is valid
-      const contentType = imageResponse.headers.get("Content-Type");
-      if (!contentType || !contentType.startsWith("image/")) {
-        return new BadRequestError("Invalid image");
-      }
-
       // Cache the original image
-      imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+      imageBuffer = Buffer.from(imageData);
       originalCache.put(baseUrl, imageBuffer);
     }
 

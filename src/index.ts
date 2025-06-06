@@ -4,6 +4,12 @@ import { OptimizeImageProcessor } from "./processor/impl/optimize-image-processo
 import { RoundedProcessor } from "./processor/impl/rounded-image-processor";
 import { index } from "./routes";
 import { proxy } from "./routes/proxy";
+import sharp from "sharp";
+
+// Configure Sharp for better performance
+sharp.cache(false); // Disable internal cache since we're using our own
+sharp.concurrency(8); // Limit concurrent operations
+sharp.simd(true); // Enable SIMD if available
 
 export const processors = [
   new SizeProcessor(),
