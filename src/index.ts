@@ -268,7 +268,7 @@ const app = new Elysia()
       let sharpImage = sharp(imageBuffer);
 
       // Run the processors
-      for (const processor of processors) {
+      for (const processor of processorsToRun) {
         sharpImage = await processor.run(options, sharpImage);
       }
 
