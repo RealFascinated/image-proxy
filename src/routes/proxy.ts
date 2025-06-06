@@ -5,6 +5,7 @@ import { BadRequestError } from "../common/error/bad-request";
 import sharp from "sharp";
 import { processors } from "..";
 import { formatBytes } from "../common/utils/utils";
+import { formatDuration } from "../common/utils/time";
 import { Caches } from "@inventivetalent/loading-cache";
 import { Time } from "@inventivetalent/time";
 
@@ -91,19 +92,14 @@ export function proxy(app: Elysia) {
     }
 
     const image = await sharpImage.toBuffer();
-    const processedSize = image.byteLength;
-
     const after = performance.now();
 
     // Log the size comparison
-    const sizeChange = ((processedSize - originalSize) / originalSize) * 100;
-    const changeType = sizeChange > 0 ? "increased" : "decreased";
+    const timeDiff = after - before;
     console.log(
-      `[${url}] Original: ${formatBytes(
-        originalSize
-      )}, Processed: ${formatBytes(processedSize)} (${Math.abs(
-        sizeChange
-      )}% ${changeType}) in ${after - before}ms`
+      `[${url}] Original: ${formatBytes(originalSize)} in ${formatDuration(
+        timeDiff
+      )}`
     );
 
     // Extract filename from URL path
