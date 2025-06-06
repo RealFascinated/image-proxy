@@ -4,6 +4,7 @@ import { getImageOptions } from "../common/image-options";
 import { BadRequestError } from "../common/error/bad-request";
 import sharp from "sharp";
 import { processors } from "..";
+import { formatBytes } from "../common/utils/utils";
 
 export function proxy(app: Elysia) {
   app.get("/*", async ({ params, query }) => {
@@ -43,16 +44,12 @@ export function proxy(app: Elysia) {
     );
 
     if (processorsToRun.length === 0) {
-      return {
-        error: "No processors found for the given options",
-      };
+      return new BadRequestError("No processors found for the given options");
     }
 
     // No options were provided
     if (Object.keys(options).length === 0) {
-      return {
-        error: "No options provided",
-      };
+      return new BadRequestError("No options provided");
     }
 
     // Fetch the image
@@ -60,9 +57,7 @@ export function proxy(app: Elysia) {
 
     // Check if the image was fetched successfully
     if (!imageResponse.ok) {
-      return {
-        error: "Failed to fetch image",
-      };
+      return new BadRequestError("Failed to fetch image");
     }
 
     // Check if the image is valid
@@ -72,6 +67,7 @@ export function proxy(app: Elysia) {
     }
 
     const imageBuffer = await imageResponse.arrayBuffer();
+    const originalSize = imageBuffer.byteLength;
 
     // Convert the image to a sharp image
     let sharpImage = sharp(imageBuffer);
@@ -82,6 +78,17 @@ export function proxy(app: Elysia) {
     }
 
     const image = await sharpImage.toBuffer();
+    const processedSize = image.byteLength;
+
+    // Log the size comparison
+    console.log(
+      `[${url}] Original: ${formatBytes(
+        originalSize
+      )}, Processed: ${formatBytes(processedSize)} (${(
+        (1 - processedSize / originalSize) *
+        100
+      ).toFixed(2)}% reduction)`
+    );
 
     // Extract filename from URL path
     const urlPath = parsedUrl.pathname;
