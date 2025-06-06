@@ -5,9 +5,14 @@ import { BadRequestError } from "../common/error/bad-request";
 import sharp from "sharp";
 import { processors } from "..";
 import { formatBytes } from "../common/utils/utils";
+import { Caches } from "@inventivetalent/loading-cache";
+import { Time } from "@inventivetalent/time";
+
+const cache = Caches.builder().expireAfterWrite(Time.minutes(10)).build();
 
 export function proxy(app: Elysia) {
   app.get("/*", async ({ params, query }) => {
+    const before = performance.now();
     const url = decodeURIComponent(params["*"]);
 
     // Extract the actual image URL and clean up any query parameters
@@ -52,21 +57,29 @@ export function proxy(app: Elysia) {
       return new BadRequestError("No options provided");
     }
 
-    // Fetch the image
-    const imageResponse = await fetch(baseUrl);
+    let imageBuffer: Buffer;
+    // Check if the original image is cached
+    if (cache.getIfPresent(baseUrl)) {
+      imageBuffer = cache.getIfPresent(baseUrl) as Buffer;
+    } else {
+      const imageResponse = await fetch(baseUrl);
 
-    // Check if the image was fetched successfully
-    if (!imageResponse.ok) {
-      return new BadRequestError("Failed to fetch image");
+      // Check if the image was fetched successfully
+      if (!imageResponse.ok) {
+        return new BadRequestError("Failed to fetch image");
+      }
+
+      // Check if the image is valid
+      const contentType = imageResponse.headers.get("Content-Type");
+      if (!contentType || !contentType.startsWith("image/")) {
+        return new BadRequestError("Invalid image");
+      }
+
+      // Cache the original image
+      imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+      cache.put(baseUrl, imageBuffer);
     }
 
-    // Check if the image is valid
-    const contentType = imageResponse.headers.get("Content-Type");
-    if (!contentType || !contentType.startsWith("image/")) {
-      return new BadRequestError("Invalid image");
-    }
-
-    const imageBuffer = await imageResponse.arrayBuffer();
     const originalSize = imageBuffer.byteLength;
 
     // Convert the image to a sharp image
@@ -80,14 +93,15 @@ export function proxy(app: Elysia) {
     const image = await sharpImage.toBuffer();
     const processedSize = image.byteLength;
 
+    const after = performance.now();
+
     // Log the size comparison
     console.log(
       `[${url}] Original: ${formatBytes(
         originalSize
-      )}, Processed: ${formatBytes(processedSize)} (${(
-        (1 - processedSize / originalSize) *
-        100
-      ).toFixed(2)}% reduction)`
+      )}, Processed: ${formatBytes(processedSize)} (${
+        (1 - processedSize / originalSize) * 100
+      }% reduction) in ${after - before}ms`
     );
 
     // Extract filename from URL path
