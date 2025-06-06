@@ -1,4 +1,4 @@
-import { Elysia } from "elysia";
+import { Elysia, ValidationError } from "elysia";
 import { getImageOptions } from "./common/image-options";
 import { isValidHttpUrl } from "./common/utils/url";
 import sharp from "sharp";
@@ -14,6 +14,41 @@ const processors = [
 ];
 
 const app = new Elysia()
+  // Handle application errors
+  .onError({ as: "global" }, ({ code, error }) => {
+    // Handle validation errors
+    if (code === "VALIDATION") {
+      return (error as ValidationError).all;
+    }
+
+    // Map error codes to status codes
+    const statusCodeMap: Record<string, number> = {
+      INTERNAL_SERVER_ERROR: 500,
+      NOT_FOUND: 404,
+      PARSE: 400,
+      INVALID_COOKIE_SIGNATURE: 401,
+    };
+
+    const status =
+      "status" in error ? error.status : statusCodeMap[code] || 500;
+    const errorCode = code === "UNKNOWN" ? "INTERNAL_SERVER_ERROR" : code;
+
+    return new Response(
+      JSON.stringify({
+        statusCode: status,
+        ...(error instanceof Error &&
+          error.message !== errorCode && { message: error.message }),
+        timestamp: new Date().toISOString(),
+      }),
+      {
+        status,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-cache",
+        },
+      }
+    );
+  })
   .get("/", ({ request }) => {
     // Get the host from the request
     const host = request.headers.get("host") || "localhost:3000";
