@@ -94,6 +94,7 @@ export function proxy(app: Elysia) {
           options.format || "webp"
         }"`,
         "Content-Type": `image/${options.format || "webp"}`,
+        "Cache-Control": "public, max-age=3600, immutable", // 1 hour
       },
     });
   });
