@@ -8,7 +8,7 @@ import sharp from "sharp";
 
 // Configure Sharp for better performance
 sharp.cache(false); // Disable internal cache since we're using our own
-sharp.concurrency(8); // Limit concurrent operations
+sharp.concurrency(4); // Limit concurrent operations to prevent memory issues
 sharp.simd(true); // Enable SIMD if available
 
 export const processors = [
